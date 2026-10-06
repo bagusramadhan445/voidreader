@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="portalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#00E5FF" />
+      <stop offset="50%" stopColor="#7928CA" />
+      <stop offset="100%" stopColor="#00E5FF" />
+    </linearGradient>
+    <radialGradient id="singularityGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stopColor="#000000" />
+      <stop offset="70%" stopColor="#080B14" />
+      <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.5" />
+    </radialGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="#080B14" />
+  <circle cx="50" cy="50" r="38" stroke="url(#portalGrad)" stroke-width="4" stroke-dasharray="12 6 24 6" />
+  <circle cx="50" cy="50" r="28" stroke="#00E5FF" stroke-width="2" stroke-opacity="0.8" stroke-dasharray="4 8" />
+  <circle cx="50" cy="50" r="18" fill="url(#singularityGrad)" />
+  <polygon points="50,40 58,50 50,60 42,50" fill="#00E5FF" />
+</svg>
