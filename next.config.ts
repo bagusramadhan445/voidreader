@@ -47,9 +47,19 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "komikcast.bz",
       },
+      {
+        protocol: "https",
+        hostname: "api.dicebear.com",
+      },
     ],
   },
-  allowedDevOrigins: ["10.160.36.166", "localhost", "127.0.0.1"],
+  allowedDevOrigins: [
+    "10.160.36.166",
+    "localhost",
+    "127.0.0.1",
+    "voidverse.my.id",
+    "voidreader-phi.vercel.app",
+  ],
 };
 
 export default nextConfig;

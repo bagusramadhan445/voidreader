@@ -3,13 +3,14 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, getSession } from "@/lib/supabase/auth";
+import { signUp } from "@/lib/supabase/auth";
 import { VoidLogo } from "@/components/ui/VoidLogo";
 import {
   LogIn,
   UserPlus,
   Mail,
   Lock,
+  User,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
@@ -17,11 +18,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-function LoginForm() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/profile";
 
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,16 +35,21 @@ function LoginForm() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!email || !password) {
-      setErrorMsg("Silakan masukkan email dan kata sandi.");
+    if (!username || !email || !password) {
+      setErrorMsg("Semua kolom (Nama Pengguna, Email, Kata Sandi) wajib diisi.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg("Kata sandi minimal harus terdiri dari 6 karakter.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // 2. Call supabase.auth.signInWithPassword()
-      const res = await signIn(email, password);
+      // 3. Register page only uses supabase.auth.signUp()
+      const res = await signUp(email, password, username);
 
       if (res.error) {
         setErrorMsg(res.error);
@@ -50,21 +57,19 @@ function LoginForm() {
         return;
       }
 
-      // 5. Verify auth session exists using supabase.auth.getSession()
-      const session = await getSession();
-      if (!session) {
-        setErrorMsg("Akun belum terdaftar atau password salah");
-        setLoading(false);
-        return;
+      if (!res.session && res.user) {
+        setSuccessMsg(
+          "Pendaftaran berhasil! Silakan periksa kotak masuk atau spam email Anda untuk konfirmasi akun sebelum masuk."
+        );
+      } else {
+        setSuccessMsg("Pendaftaran berhasil! Mengalihkan ke akun Anda...");
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1200);
       }
-
-      setSuccessMsg("Berhasil masuk! Mengalihkan ke akun Anda...");
-      setTimeout(() => {
-        router.push(redirectPath);
-      }, 1000);
     } catch (err: unknown) {
       setErrorMsg(
-        err instanceof Error ? err.message : "Terjadi kesalahan sistem saat masuk."
+        err instanceof Error ? err.message : "Terjadi kesalahan sistem saat mendaftar."
       );
     } finally {
       setLoading(false);
@@ -87,20 +92,20 @@ function LoginForm() {
       <div className="bg-[#111827] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,229,255,0.15)] backdrop-blur-xl">
         {/* Mode Switcher Tabs */}
         <div className="flex p-1 bg-[#080B14] rounded-2xl border border-white/5 mb-6">
+          <Link
+            href={`/login${redirectPath !== "/profile" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
+            className="flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all text-gray-400 hover:text-white"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Masuk</span>
+          </Link>
           <button
             type="button"
             className="flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all bg-[#00E5FF] text-black shadow-[0_0_15px_rgba(0,229,255,0.4)]"
           >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Masuk</span>
-          </button>
-          <Link
-            href={`/register${redirectPath !== "/profile" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
-            className="flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all text-gray-400 hover:text-white"
-          >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Daftar Akun</span>
-          </Link>
+          </button>
         </div>
 
         {/* Feedback Alerts */}
@@ -118,8 +123,25 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Login Form */}
+        {/* Register Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-300 block mb-1.5">
+              Nama Pengguna
+            </label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="misal: KazutoOtaku"
+                className="w-full bg-[#080B14] border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-[#00E5FF] focus:outline-none focus:ring-1 focus:ring-[#00E5FF]/40 transition-all"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-semibold text-gray-300 block mb-1.5">
               Alamat Email
@@ -148,7 +170,7 @@ function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Minimal 6 karakter"
                 className="w-full bg-[#080B14] border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-[#00E5FF] focus:outline-none focus:ring-1 focus:ring-[#00E5FF]/40 transition-all"
               />
             </div>
@@ -162,26 +184,26 @@ function LoginForm() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Memverifikasi Akun...</span>
+                <span>Mendaftarkan Akun...</span>
               </>
             ) : (
               <>
-                <span>Masuk ke Void</span>
+                <span>Buat Akun Baru</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
 
-        {/* Link to Register */}
+        {/* Link to Login */}
         <div className="mt-4 text-center">
           <p className="text-xs text-gray-400">
-            Belum punya akun?{" "}
+            Sudah punya akun?{" "}
             <Link
-              href={`/register${redirectPath !== "/profile" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
+              href={`/login${redirectPath !== "/profile" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
               className="text-[#00E5FF] hover:underline font-semibold"
             >
-              Daftar sekarang
+              Masuk di sini
             </Link>
           </p>
         </div>
@@ -215,7 +237,7 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#080B14] flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
       {/* Background ambient neon glow effects */}
@@ -229,7 +251,7 @@ export default function LoginPage() {
           </div>
         }
       >
-        <LoginForm />
+        <RegisterForm />
       </Suspense>
     </div>
   );

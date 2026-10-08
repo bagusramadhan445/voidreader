@@ -61,6 +61,11 @@ export default function ProfilePage() {
           db.bookmarks.count(),
         ]);
 
+        if (!currentUser) {
+          router.replace("/login?redirect=/profile");
+          return;
+        }
+
         setUser(currentUser);
         if (currentUser?.user_metadata?.username) {
           setEditUsername(currentUser.user_metadata.username);
