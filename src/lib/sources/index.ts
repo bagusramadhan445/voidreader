@@ -2,17 +2,27 @@ import { KomikuSource } from "./komiku";
 import { KomikcastSource } from "./komikcast";
 import { ShinigamiSource } from "./shinigami";
 import { WebtoonSource } from "./webtoon";
-import { MangaSource } from "./types";
+import { AllSourcesAggregator } from "./all";
+import { MangaSource, MangaItem, HomeData } from "./types";
 
 class SourceManager {
   private sources: Map<string, MangaSource> = new Map();
   private defaultSourceId = "komiku";
+  private aggregator: AllSourcesAggregator;
 
   constructor() {
-    this.registerSource(new KomikuSource());
-    this.registerSource(new KomikcastSource());
-    this.registerSource(new ShinigamiSource());
-    this.registerSource(new WebtoonSource());
+    const komiku = new KomikuSource();
+    const komikcast = new KomikcastSource();
+    const shinigami = new ShinigamiSource();
+    const webtoon = new WebtoonSource();
+
+    this.registerSource(komiku);
+    this.registerSource(komikcast);
+    this.registerSource(shinigami);
+    this.registerSource(webtoon);
+
+    this.aggregator = new AllSourcesAggregator(komiku, komikcast, shinigami, webtoon);
+    this.registerSource(this.aggregator);
   }
 
   registerSource(source: MangaSource): void {
@@ -97,6 +107,20 @@ class SourceManager {
   getDefaultSourceId(): string {
     return this.defaultSourceId;
   }
+
+  /**
+   * Fetches latest chapter updates across ALL sources, sorted newest chapter to oldest
+   */
+  async getAllLatest(limit = 200): Promise<MangaItem[]> {
+    return this.aggregator.getLatest(1, limit);
+  }
+
+  /**
+   * Fetches combined HomeData across all sources with 200 sorted latest updates
+   */
+  async getAllHome(): Promise<HomeData> {
+    return this.aggregator.getHome();
+  }
 }
 
 // Global singleton instance
@@ -106,4 +130,4 @@ if (process.env.NODE_ENV !== "production") globalForSources.sourceManager = sour
 
 export * from "./types";
 export * from "./chapter-utils";
-export { KomikuSource, KomikcastSource, ShinigamiSource, WebtoonSource };
+export { KomikuSource, KomikcastSource, ShinigamiSource, WebtoonSource, AllSourcesAggregator };

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { MangaItem } from "@/lib/sources";
-import { normalizeImageUrl } from "@/lib/image-utils";
+import { getMangaCoverCandidates } from "@/lib/image-utils";
 import { Play, Info, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
 interface HeroBannerProps {
@@ -14,19 +14,20 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = items && items.length > 0 ? items[currentIndex] : null;
 
-  const rawHeroImage = normalizeImageUrl(
-    current?.banner ||
-    current?.cover ||
-    current?.thumbnail ||
-    current?.poster
-  );
-  const [heroImage, setHeroImage] = useState(rawHeroImage);
-  const [hasProxied, setHasProxied] = useState(false);
+  const candidates = current ? getMangaCoverCandidates(current, current.sourceId) : ["/placeholder.jpg"];
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [isProxied, setIsProxied] = useState(false);
+
+  const currentCandidate = candidates[candidateIndex] || "/placeholder.jpg";
+  const heroImage =
+    isProxied && !currentCandidate.startsWith("/") && !currentCandidate.startsWith("/placeholder")
+      ? `/api/proxy/image?url=${encodeURIComponent(currentCandidate)}`
+      : currentCandidate;
 
   useEffect(() => {
-    setHeroImage(rawHeroImage);
-    setHasProxied(false);
-  }, [rawHeroImage]);
+    setCandidateIndex(0);
+    setIsProxied(false);
+  }, [currentIndex, current?.id]);
 
   useEffect(() => {
     if (!items || items.length <= 1) return;
@@ -39,12 +40,17 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   if (!items || items.length === 0 || !current) return null;
 
   const handleImageError = () => {
-    if (!hasProxied && rawHeroImage && !rawHeroImage.startsWith("/") && !rawHeroImage.startsWith("/placeholder")) {
-      setHasProxied(true);
-      setHeroImage(`/api/proxy/image?url=${encodeURIComponent(rawHeroImage)}`);
-    } else {
-      setHeroImage("/placeholder.jpg");
+    if (!isProxied && !currentCandidate.startsWith("/") && !currentCandidate.startsWith("/placeholder")) {
+      setIsProxied(true);
+      return;
     }
+    if (candidateIndex + 1 < candidates.length) {
+      setCandidateIndex((prev) => prev + 1);
+      setIsProxied(false);
+      return;
+    }
+    setCandidateIndex(candidates.length);
+    setIsProxied(false);
   };
 
   // Debug log required by spec
@@ -107,7 +113,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
           <p className="mt-2.5 text-sm md:text-base text-gray-300 line-clamp-2 md:line-clamp-3 leading-relaxed max-w-xl">
             {current.synopsis ||
               current.updatedAt ||
-              "Baca kelanjutan kisah menarik manga Bahasa Indonesia terlengkap hanya di Void Reader."}
+              "Baca kelanjutan kisah menarik manga Bahasa Indonesia terlengkap hanya di Void Verse."}
           </p>
 
           {/* CTA Buttons */}

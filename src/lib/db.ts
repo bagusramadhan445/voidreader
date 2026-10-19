@@ -15,16 +15,21 @@ export interface HistoryRecord {
   id: string; // mangaId / slug
   title: string;
   cover?: string;
+  coverUrl?: string;
   thumbnail: string;
   lastChapterId: string;
   lastChapterTitle: string;
   lastReadAt: number;
   sourceId: string;
+  progress?: number; // 0 - 100 percentage
+  pageIndex?: number;
+  totalPage?: number;
 }
 
 export interface ReadingProgressRecord {
   chapterId: string;
   mangaId?: string;
+  sourceId?: string;
   pageIndex: number;
   scrollPercent: number;
   updatedAt: number;

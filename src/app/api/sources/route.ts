@@ -1,5 +1,6 @@
 import { sourceManager } from "@/lib/sources";
 import { NextResponse } from "next/server";
+import { toSafeErrorMessage } from "@/lib/security/input-validator";
 
 export async function GET() {
   try {
@@ -10,7 +11,9 @@ export async function GET() {
       default: "komiku",
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error listing sources";
+    console.error("[API /api/sources] Error:", error);
+    const message = toSafeErrorMessage(error, "Gagal memuat daftar sumber komik.");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+

@@ -1,5 +1,5 @@
 /**
- * Void Reader - Monetization & Support Configuration
+ * Void Verse - Monetization & Support Configuration
  * 
  * Configured for non-intrusive monetization:
  * - Developer Gaming Top-up Promotion (kazutogaming)
@@ -49,8 +49,8 @@ export const MONETIZATION_CONFIG: MonetizationConfig = {
   donation: {
     enabled: true,
     provider: "Saweria",
-    title: "Support Void Reader",
-    description: "Help support the development and maintenance of Void Reader.",
+    title: "Support Void Verse",
+    description: "Help support the development and maintenance of Void Verse.",
     buttonText: "Donate via Saweria",
     url: "https://saweria.co/baguskazuto",
     badge: "Community",

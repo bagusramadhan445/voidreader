@@ -1,5 +1,6 @@
 import { sourceManager } from "@/lib/sources";
 import { NextRequest, NextResponse } from "next/server";
+import { toSafeErrorMessage } from "@/lib/security/input-validator";
 
 export async function GET(
   request: NextRequest,
@@ -27,11 +28,12 @@ export async function GET(
       data,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error("[API /api/manga/[slug]] Error:", error);
+    const message = toSafeErrorMessage(error, "Gagal memuat detail komik. Silakan coba beberapa saat lagi.");
     return NextResponse.json(
       { success: false, error: message },
       { status: 500 }
     );
   }
 }
+

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { sourceManager, MangaDetail } from "@/lib/sources";
 import { MangaDetailClient } from "@/components/manga/MangaDetailClient";
 import { Loader2 } from "lucide-react";
+import { safeJsonLdStringify, sanitizeMetadataString } from "@/lib/security/json-ld";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -19,7 +20,7 @@ async function getMangaData(
     return { manga, sourceName: source.name };
   } catch (error) {
     console.error(`[MangaDetailPage] Failed to fetch manga ${slug}:`, error);
-    return { manga: null, sourceName: "Void Reader" };
+    return { manga: null, sourceName: "Void Verse" };
   }
 }
 
@@ -40,7 +41,7 @@ export async function generateMetadata(
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
     const fallbackTitle = `${cleanTitle} - Baca Manga Online`;
-    const fallbackDesc = `Baca komik ${cleanTitle} Bahasa Indonesia terbaru gratis di Void Reader. Portal baca manga, manhwa, dan manhua kualitas HD dengan update tercepat.`;
+    const fallbackDesc = `Baca komik ${cleanTitle} Bahasa Indonesia terbaru gratis di Void Verse. Portal baca manga, manhwa, dan manhua kualitas HD dengan update tercepat.`;
     return {
       title: fallbackTitle,
       description: fallbackDesc,
@@ -53,7 +54,7 @@ export async function generateMetadata(
         type: "book",
         url: `${siteUrl}/manga/${slug}`,
         locale: "id_ID",
-        siteName: "Void Reader",
+        siteName: "Void Verse",
       },
       twitter: {
         card: "summary_large_image",
@@ -67,7 +68,7 @@ export async function generateMetadata(
   const rawDesc =
     manga.synopsis ||
     manga.description ||
-    `Baca komik ${manga.title} Bahasa Indonesia online gratis di Void Reader. Kualitas HD dengan update chapter tercepat.`;
+    `Baca komik ${manga.title} Bahasa Indonesia online gratis di Void Verse. Kualitas HD dengan update chapter tercepat.`;
   const description =
     rawDesc.length > 160 ? rawDesc.slice(0, 157).trim() + "..." : rawDesc;
   const coverImage = manga.cover || manga.thumbnail;
@@ -81,7 +82,7 @@ export async function generateMetadata(
       `${manga.title} chapter`,
       "baca manga",
       "baca komik online",
-      "void reader",
+      "void verse",
       ...(manga.genres || []),
     ],
     alternates: {
@@ -92,7 +93,7 @@ export async function generateMetadata(
       description,
       type: "book",
       url: `${siteUrl}/manga/${slug}`,
-      siteName: "Void Reader",
+      siteName: "Void Verse",
       locale: "id_ID",
       images: coverImage
         ? [
@@ -120,29 +121,32 @@ export default async function MangaDetailPage({ params, searchParams }: Props) {
   const { manga, sourceName } = await getMangaData(slug, sourceParam);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voidverse.my.id";
 
-  // Schema.org Book JSON-LD structured data
+  // Schema.org Book JSON-LD structured data with XSS sanitization
   const jsonLd = manga
     ? {
         "@context": "https://schema.org",
         "@type": "Book",
-        name: manga.title,
-        headline: `${manga.title} - Baca Manga Online`,
-        description:
+        name: sanitizeMetadataString(manga.title),
+        headline: `${sanitizeMetadataString(manga.title)} - Baca Manga Online`,
+        description: sanitizeMetadataString(
           manga.synopsis ||
           manga.description ||
-          `Baca komik ${manga.title} Bahasa Indonesia di Void Reader`,
+          `Baca komik ${manga.title} Bahasa Indonesia di Void Verse`
+        ),
         image: manga.cover || manga.thumbnail,
         author: {
           "@type": "Person",
-          name: manga.author || "Unknown",
+          name: sanitizeMetadataString(manga.author) || "Unknown",
         },
         publisher: {
           "@type": "Organization",
-          name: sourceName || "Void Reader",
+          name: sanitizeMetadataString(sourceName) || "Void Verse",
         },
-        genre: manga.genres,
+        genre: Array.isArray(manga.genres)
+          ? manga.genres.map((g) => sanitizeMetadataString(g))
+          : [],
         inLanguage: "id-ID",
-        url: `${siteUrl}/manga/${slug}`,
+        url: `${siteUrl}/manga/${encodeURIComponent(slug)}`,
       }
     : null;
 
@@ -151,7 +155,7 @@ export default async function MangaDetailPage({ params, searchParams }: Props) {
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(jsonLd) }}
         />
       )}
       <Suspense

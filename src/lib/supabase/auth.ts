@@ -12,18 +12,151 @@ let memoryMockUsers: MockStoredUser[] = [];
 let memorySessionUser: User | null = null;
 let memoryCookieToken: string | null = null;
 
-// Cookie helpers for Next.js middleware sync
+/**
+ * Generates a cryptographically secure random hex salt (16 bytes = 32 hex chars).
+ */
+export function generateMockSalt(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return "dev_salt_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+/**
+ * Derives a 256-bit PBKDF2 HMAC-SHA-256 key using WebCrypto.
+ * Iterations default to 100,000 for standard work factor key stretching.
+ */
+export async function derivePbkdf2Hash(
+  password: string,
+  saltHex: string,
+  iterations = 100000
+): Promise<string> {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(password),
+      { name: "PBKDF2" },
+      false,
+      ["deriveBits"]
+    );
+    const derivedBits = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: encoder.encode(saltHex),
+        iterations,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      256
+    );
+    return Array.from(new Uint8Array(derivedBits))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  // Safe fallback for environments lacking crypto.subtle
+  return "hash_" + Buffer.from(password + saltHex).toString("base64");
+}
+
+/**
+ * Hash password for local development/offline demo mode using PBKDF2 (100,000 rounds).
+ * Formats as "pbkdf2:100000:<saltHex>:<hashHex>".
+ * NEVER stores plaintext passwords in localStorage.
+ */
+export async function hashMockPassword(
+  password: string,
+  customSalt?: string
+): Promise<string> {
+  const salt = customSalt || generateMockSalt();
+  const iterations = 100000;
+  const hash = await derivePbkdf2Hash(password, salt, iterations);
+  return `pbkdf2:${iterations}:${salt}:${hash}`;
+}
+
+/**
+ * Legacy single-round SHA-256 computation for backward compatibility with old mock accounts.
+ */
+export async function hashLegacySha256(password: string): Promise<string> {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + "_voidverse_salt_dev");
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  return "hash_" + Buffer.from(password + "_voidverse_salt_dev").toString("base64");
+}
+
+/**
+ * Verifies a password against a stored mock hash (PBKDF2, legacy SHA-256, or migrated base64).
+ */
+export async function verifyMockPassword(
+  password: string,
+  storedHash: string
+): Promise<boolean> {
+  if (!storedHash) return false;
+
+  // 1. Modern PBKDF2 format
+  if (storedHash.startsWith("pbkdf2:")) {
+    const parts = storedHash.split(":");
+    if (parts.length === 4) {
+      const iterations = parseInt(parts[1], 10) || 100000;
+      const salt = parts[2];
+      const expected = parts[3];
+      const actual = await derivePbkdf2Hash(password, salt, iterations);
+      return actual === expected;
+    }
+  }
+
+  // 2. Backward compatibility: Legacy single-round SHA-256
+  const legacySha = await hashLegacySha256(password);
+  if (storedHash === legacySha) {
+    return true;
+  }
+
+  // 3. Backward compatibility: Legacy base64
+  if (storedHash === "migrated_" + Buffer.from(password).toString("base64")) {
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
+ * Cookie and Session helpers
+ * Syncs with server-side HttpOnly, Secure, SameSite=Lax session via /api/auth/session
+ */
 export function setAuthCookie(token: string, maxAgeSeconds: number = 604800) {
   memoryCookieToken = token;
-  if (typeof document !== "undefined") {
-    document.cookie = `void_auth_token=${encodeURIComponent(token)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+  if (typeof window !== "undefined") {
+    // 1. Sync session cookie to server with HttpOnly
+    fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, maxAge: maxAgeSeconds }),
+    }).catch(() => {});
+
+    // 2. Client-side fallback cookie for non-sensitive UI checks (SameSite=Lax, Secure over HTTPS)
+    const isSecure = window.location.protocol === "https:";
+    document.cookie = `void_auth_token=${encodeURIComponent(token)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${isSecure ? "; Secure" : ""}`;
   }
 }
 
 export function clearAuthCookie() {
   memoryCookieToken = null;
-  if (typeof document !== "undefined") {
-    document.cookie = "void_auth_token=; path=/; max-age=0; SameSite=Lax";
+  if (typeof window !== "undefined") {
+    // 1. Clear server-side session cookie
+    fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
+
+    // 2. Clear client-side cookie
+    const isSecure = window.location.protocol === "https:";
+    document.cookie = `void_auth_token=; path=/; max-age=0; SameSite=Lax${isSecure ? "; Secure" : ""}`;
   }
 }
 
@@ -42,7 +175,7 @@ const LOCAL_AUTH_SESSION_KEY = "void_reader_local_auth_user";
 interface MockStoredUser {
   id: string;
   email: string;
-  password?: string;
+  passwordHash: string; // Plaintext passwords are NEVER stored
   username: string;
   avatar_url: string;
 }
@@ -51,7 +184,36 @@ function getStoredMockUsers(): MockStoredUser[] {
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem(LOCAL_AUTH_USERS_KEY);
-      return raw ? JSON.parse(raw) : [];
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+
+      let migrated = false;
+      const cleanUsers: MockStoredUser[] = parsed.map((item: unknown) => {
+        const u = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+        if (typeof u.password === "string" && !u.passwordHash) {
+          migrated = true;
+          return {
+            id: String(u.id || ""),
+            email: String(u.email || ""),
+            passwordHash: "migrated_" + Buffer.from(u.password).toString("base64"),
+            username: typeof u.username === "string" ? u.username : "",
+            avatar_url: typeof u.avatar_url === "string" ? u.avatar_url : "",
+          };
+        }
+        return {
+          id: String(u.id || ""),
+          email: String(u.email || ""),
+          passwordHash: typeof u.passwordHash === "string" ? u.passwordHash : "",
+          username: typeof u.username === "string" ? u.username : "",
+          avatar_url: typeof u.avatar_url === "string" ? u.avatar_url : "",
+        };
+      });
+
+      if (migrated) {
+        localStorage.setItem(LOCAL_AUTH_USERS_KEY, JSON.stringify(cleanUsers));
+      }
+      return cleanUsers;
     } catch {
       return [];
     }
@@ -123,7 +285,16 @@ export async function signUp(
   const supabase = getSupabase();
 
   if (!supabase) {
-    // Local mock registration for preview/offline mode
+    // In production, strictly reject mock registration
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+      return {
+        user: null,
+        session: null,
+        error: "Layanan autentikasi Supabase wajib dikonfigurasi di lingkungan produksi.",
+      };
+    }
+
+    // Local mock registration for preview/offline development
     const users = getStoredMockUsers();
     const existing = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (existing) {
@@ -136,10 +307,11 @@ export async function signUp(
 
     const mockId = "local-user-" + Date.now();
     const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(username)}`;
+    const passwordHash = await hashMockPassword(password);
     const newMockUser: MockStoredUser = {
       id: mockId,
       email: email.trim(),
-      password,
+      passwordHash,
       username,
       avatar_url: avatarUrl,
     };
@@ -219,20 +391,42 @@ export async function signIn(
   const supabase = getSupabase();
 
   if (!supabase) {
-    // Local mock login for offline / unconfigured demo
+    // In production, strictly reject mock login
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+      return {
+        user: null,
+        session: null,
+        error: "Layanan autentikasi Supabase wajib dikonfigurasi di lingkungan produksi.",
+      };
+    }
+
+    // Local mock login for offline / unconfigured development
     const users = getStoredMockUsers();
     const userMatch = users.find(
       (u) => u.email.toLowerCase() === email.trim().toLowerCase()
     );
 
-    // If user does not exist or password does not match:
-    if (!userMatch || userMatch.password !== password) {
+    const isMatch =
+      userMatch && (await verifyMockPassword(password, userMatch.passwordHash));
+
+    if (!userMatch || !isMatch) {
       return {
         user: null,
         session: null,
         error: "Akun belum terdaftar atau password salah",
       };
     }
+
+    // Transparently upgrade legacy hash to PBKDF2 with unique salt upon successful verification
+    if (userMatch.passwordHash && !userMatch.passwordHash.startsWith("pbkdf2:")) {
+      try {
+        userMatch.passwordHash = await hashMockPassword(password);
+        saveStoredMockUsers(users);
+      } catch {
+        // Silently continue if upgrade storage fails
+      }
+    }
+
 
     const mockUser: User = {
       id: userMatch.id,
@@ -261,13 +455,11 @@ export async function signIn(
   }
 
   try {
-    // 2. Call supabase.auth.signInWithPassword()
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
 
-    // If credentials are invalid, email not confirmed, or user does not exist:
     if (error || !data.user) {
       if (
         error?.message &&
@@ -287,7 +479,6 @@ export async function signIn(
       };
     }
 
-    // 5. Verify auth session exists using supabase.auth.getSession()
     const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
     const activeSession = sessionData?.session || data.session;
 
@@ -379,7 +570,6 @@ export function onAuthStateChange(
   const supabase = getSupabase();
 
   if (!supabase) {
-    // Initial callback check for local preview user
     const user = getStoredSessionUser();
     if (user) {
       callback("SIGNED_IN", null, user);

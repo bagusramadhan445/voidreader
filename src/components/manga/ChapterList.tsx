@@ -54,6 +54,14 @@ export const ChapterList: React.FC<ChapterListProps> = ({
       }
     }
     loadStatus();
+
+    window.addEventListener("void_reading_progress_updated", loadStatus);
+    window.addEventListener("focus", loadStatus);
+
+    return () => {
+      window.removeEventListener("void_reading_progress_updated", loadStatus);
+      window.removeEventListener("focus", loadStatus);
+    };
   }, [mangaId]);
 
   // Robust Numeric Filter & Sort

@@ -1,5 +1,5 @@
 -- ====================================================================
--- VOID READER - SUPABASE DATABASE SCHEMA
+-- VOID VERSE - SUPABASE DATABASE SCHEMA
 -- ====================================================================
 
 -- 1. Profiles Table

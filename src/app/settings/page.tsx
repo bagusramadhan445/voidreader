@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/router";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { db, UserSettingsRecord } from "@/lib/db";
@@ -31,6 +30,7 @@ import {
   Sparkles,
   ShieldCheck,
   Zap,
+  Wrench,
 } from "lucide-react";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -288,6 +288,70 @@ export default function SettingsPage() {
             <span>{cacheStatus}</span>
           </div>
         )}
+
+        {/* VOID TOOLS CENTRAL HUB PORTAL CARD */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0c1427] via-[#111827] to-[#151c2e] border border-cyan-500/30 p-6 sm:p-8 shadow-[0_0_35px_rgba(0,229,255,0.12)]">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-cyan-500 text-black shadow-[0_0_12px_rgba(0,229,255,0.4)]">
+                  Fitur Baru
+                </span>
+                <span className="text-xs font-mono text-[#00E5FF] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  <span>60 Utilitas Cerdas Terintegrasi</span>
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+                  <Wrench className="w-6 h-6 text-[#00E5FF]" />
+                  Void Tools Central Hub
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-300 mt-1 max-w-xl leading-relaxed">
+                  Pusat utilitas multifungsi VoidVerse: Void AI, Downloader, Web Scraper, Image Forge, Pengolah PDF & Dokumen, dan Developer Tools.
+                </p>
+              </div>
+
+              {/* Category Pills Preview */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  { name: "Void AI", color: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10" },
+                  { name: "Void Downloader", color: "text-sky-400 border-sky-500/30 bg-sky-500/10" },
+                  { name: "Void Scraper", color: "text-purple-400 border-purple-500/30 bg-purple-500/10" },
+                  { name: "Void Forge", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
+                  { name: "Void Document", color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" },
+                  { name: "Void Developer", color: "text-pink-400 border-pink-500/30 bg-pink-500/10" },
+                ].map((c) => (
+                  <span
+                    key={c.name}
+                    className={`px-2.5 py-0.5 rounded-lg border text-[11px] font-mono ${c.color}`}
+                  >
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col sm:flex-row md:flex-col gap-2.5">
+              <NextLink
+                href="/settings/tools"
+                className="px-6 py-3 rounded-2xl bg-[#00E5FF] hover:bg-cyan-300 text-black text-xs font-black shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center justify-center gap-2 transition-all"
+              >
+                <Zap className="w-4 h-4 fill-black" />
+                <span>Buka Void Tools (60 Alat) ➜</span>
+              </NextLink>
+              <NextLink
+                href="/settings/tools/config"
+                className="px-4 py-2.5 rounded-xl bg-[#080B14] hover:bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Konfigurasi Kunci API</span>
+              </NextLink>
+            </div>
+          </div>
+        </section>
 
         {/* 1. PENGATURAN MEMBACA */}
         <section className="bg-[#111827] rounded-3xl border border-white/5 p-5 sm:p-7 shadow-xl space-y-6">
@@ -600,7 +664,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-white">5. Support Developer & Monetisasi</h2>
-              <p className="text-xs text-gray-400">Dukung pemeliharaan Void Reader secara sukarela</p>
+              <p className="text-xs text-gray-400">Dukung pemeliharaan Void Verse secara sukarela</p>
             </div>
           </div>
 
@@ -712,7 +776,7 @@ export default function SettingsPage() {
 
         {/* Footer Info */}
         <div className="text-center py-6 text-xs text-gray-500 font-mono">
-          Void Reader v2.0 Ultimate • Void Portal Futuristic Design • Multi-Source Manga Reader
+          Void Verse v2.0 Ultimate • Void Portal Futuristic Design • Multi-Source Manga Reader
         </div>
       </div>
     </div>

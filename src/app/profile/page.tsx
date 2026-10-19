@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { db, HistoryRecord } from "@/lib/db";
 import { getCurrentUser, signOut } from "@/lib/supabase/auth";
 import { syncLocalToCloud, getLastSyncTime } from "@/lib/supabase/sync";
+import { getBestMangaCover } from "@/lib/image-utils";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import {
   User,
@@ -535,9 +536,17 @@ export default function ProfilePage() {
                   className="p-3.5 rounded-2xl bg-[#080B14] border border-white/5 flex gap-3 hover:border-cyan-500/40 transition-all group"
                 >
                   <img
-                    src={item.cover || item.thumbnail || "/placeholder.jpg"}
+                    src={getBestMangaCover(item, item.sourceId)}
                     alt={item.title}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes("/api/proxy/image") && !target.src.startsWith("/") && !target.src.includes("placeholder.jpg")) {
+                        target.src = `/api/proxy/image?url=${encodeURIComponent(target.src)}`;
+                      } else if (!target.src.endsWith("/placeholder.jpg")) {
+                        target.src = "/placeholder.jpg";
+                      }
+                    }}
                     className="w-14 h-20 object-cover rounded-xl shrink-0 group-hover:scale-105 transition-transform"
                   />
                   <div className="flex flex-col justify-between min-w-0">

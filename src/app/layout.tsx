@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { safeJsonLdStringify } from "@/lib/security/json-ld";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,15 +20,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voidverse.my.id";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    template: "%s | Void Reader",
-    default: "Void Reader - Baca Manga & Manhwa Online",
+    template: "%s | Void Verse",
+    default: "Void Verse - Baca Manga & Manhwa Online",
   },
   description:
-    "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Reader. Tampilan streaming modern, cepat, dan nyaman.",
-  applicationName: "Void Reader",
-  authors: [{ name: "Void Reader" }],
-  creator: "Void Reader",
-  publisher: "Void Reader",
+    "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Verse. Tampilan streaming modern, cepat, dan nyaman.",
+  applicationName: "Void Verse",
+  authors: [{ name: "Void Verse" }],
+  creator: "Void Verse",
+  publisher: "Void Verse",
   keywords: [
     "baca manga",
     "baca manhwa",
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
     "shinigami",
     "webtoon",
     "baca komik online",
-    "void reader",
+    "void verse",
     "voidverse",
   ],
   alternates: {
@@ -70,31 +71,31 @@ export const metadata: Metadata = {
     type: "website",
     locale: "id_ID",
     url: siteUrl,
-    siteName: "Void Reader",
-    title: "Void Reader - Baca Manga & Manhwa Online",
+    siteName: "Void Verse",
+    title: "Void Verse - Baca Manga & Manhwa Online",
     description:
-      "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Reader. Tampilan streaming modern, cepat, dan nyaman.",
+      "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Verse. Tampilan streaming modern, cepat, dan nyaman.",
     images: [
       {
         url: "/placeholder.jpg",
         width: 1200,
         height: 630,
-        alt: "Void Reader - Baca Manga & Manhwa Online",
+        alt: "Void Verse - Baca Manga & Manhwa Online",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Void Reader - Baca Manga & Manhwa Online",
+    title: "Void Verse - Baca Manga & Manhwa Online",
     description:
-      "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Reader.",
+      "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Verse.",
     images: ["/placeholder.jpg"],
   },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Void Reader",
+    title: "Void Verse",
   },
 };
 
@@ -114,10 +115,10 @@ const schemaOrgGraph = {
       "@type": "WebSite",
       "@id": `${siteUrl}/#website`,
       url: siteUrl,
-      name: "Void Reader",
-      alternateName: ["VoidReader", "VoidVerse"],
+      name: "Void Verse",
+      alternateName: ["VoidVerse", "Void Verse"],
       description:
-        "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Reader.",
+        "Platform baca manga, manhwa, dan manhua Bahasa Indonesia terlengkap dan terupdate gratis di Void Verse.",
       potentialAction: {
         "@type": "SearchAction",
         target: `${siteUrl}/explore?query={search_term_string}`,
@@ -128,7 +129,7 @@ const schemaOrgGraph = {
     {
       "@type": "WebApplication",
       "@id": `${siteUrl}/#app`,
-      name: "Void Reader",
+      name: "Void Verse",
       url: siteUrl,
       applicationCategory: "EntertainmentApplication",
       operatingSystem: "All",
@@ -154,7 +155,7 @@ export default function RootLayout({
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaOrgGraph) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(schemaOrgGraph) }}
         />
       </head>
       <body

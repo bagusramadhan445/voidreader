@@ -502,7 +502,7 @@ export class WebtoonSource implements MangaSource {
         poster: cover,
         banner: cover,
         bannerImage: cover,
-        synopsis: synopsis || "Baca komik Webtoon Indonesia resmi terlengkap di Void Reader.",
+        synopsis: synopsis || "Baca komik Webtoon Indonesia resmi terlengkap di Void Verse.",
         author: author || undefined,
         status: "Ongoing",
         type: "Webtoon",

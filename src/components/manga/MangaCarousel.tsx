@@ -88,7 +88,7 @@ export const MangaCarousel: React.FC<MangaCarouselProps> = ({
         className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0"
       >
         {items.map((manga) => (
-          <div key={manga.id} className="shrink-0 w-36 sm:w-44 md:w-52 lg:w-56">
+          <div key={`${manga.sourceId || "src"}-${manga.id}`} className="shrink-0 w-36 sm:w-44 md:w-52 lg:w-56">
             <MangaCard manga={manga} />
           </div>
         ))}

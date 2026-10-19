@@ -10,8 +10,10 @@ import { OfflineManager } from "@/lib/offline";
 import { TopupBanner } from "@/components/ads/TopupBanner";
 import { DonationCard } from "@/components/support/DonationCard";
 import { ChapterCommentSection } from "@/components/comments/ChapterCommentSection";
+import { safeJsonLdStringify, sanitizeMetadataString } from "@/lib/security/json-ld";
 import {
   ArrowLeft,
+  Home,
   ChevronLeft,
   ChevronRight,
   Maximize,
@@ -74,6 +76,14 @@ function ReaderPageContent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronization & persistence refs
+  const isRestoredRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const hasPendingSaveRef = useRef(false);
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const latestProgressRef = useRef({ pageIndex: 0, scrollPercent: 0 });
+  const [mangaMeta, setMangaMeta] = useState<{ title?: string; cover?: string }>({});
 
   // Effective manga ID: query param > chapterData mangaId > derived slug
   const effectiveMangaId =
@@ -147,8 +157,16 @@ function ReaderPageContent() {
         const res = await fetch(mangaUrl);
         if (!res.ok) return;
         const json = await res.json();
-        if (isMounted && json.success && Array.isArray(json.data?.chapters)) {
-          setChaptersList(json.data.chapters);
+        if (isMounted && json.success && json.data) {
+          if (Array.isArray(json.data.chapters)) {
+            setChaptersList(json.data.chapters);
+          }
+          if (json.data.title || json.data.cover || json.data.thumbnail) {
+            setMangaMeta({
+              title: json.data.title,
+              cover: json.data.cover || json.data.thumbnail,
+            });
+          }
         }
       } catch (err) {
         console.warn("[Reader] Gagal memuat daftar chapter manga:", err);
@@ -263,50 +281,153 @@ function ReaderPageContent() {
   const sourceQueryParam =
     sourceParam || data?.sourceId ? `&source=${sourceParam || data?.sourceId}` : "";
 
-  // Navigation callbacks
-  const navigateToPrev = useCallback(() => {
+  // Navigation callbacks with immediate progress flush
+  const navigateToPrev = useCallback(async () => {
     if (prevChapter) {
+      await flushProgress();
       router.push(`/reader/${prevChapter.id}?manga=${effectiveMangaId}${sourceQueryParam}`);
     }
   }, [prevChapter, effectiveMangaId, router, sourceQueryParam]);
 
-  const navigateToNext = useCallback(() => {
+  const navigateToNext = useCallback(async () => {
     if (nextChapter) {
+      await flushProgress();
       router.push(`/reader/${nextChapter.id}?manga=${effectiveMangaId}${sourceQueryParam}`);
     }
   }, [nextChapter, effectiveMangaId, router, sourceQueryParam]);
 
-  // 3. Save reading progress & history to IndexedDB
-  const saveProgress = useCallback(
-    async (pageIdx: number, scrollPct: number) => {
-      if (!chapterSlug || !data) return;
-      try {
-        await db.readingProgress.put({
-          chapterId: chapterSlug,
-          mangaId: effectiveMangaId || undefined,
-          pageIndex: pageIdx,
-          scrollPercent: scrollPct,
-          updatedAt: Date.now(),
-        });
+  // Core save function writing to IndexedDB and dispatching sync events
+  const executeSave = useCallback(async () => {
+    if (!chapterSlug || !data || !isRestoredRef.current) return;
 
-        if (effectiveMangaId) {
-          const existingHistory = await db.history.get(effectiveMangaId);
-          await db.history.put({
-            id: effectiveMangaId,
-            title: existingHistory?.title || data.title,
-            thumbnail: existingHistory?.thumbnail || "/placeholder.jpg",
-            lastChapterId: chapterSlug,
-            lastChapterTitle: data.title,
-            lastReadAt: Date.now(),
-            sourceId: data.sourceId,
-          });
-        }
-      } catch (e) {
-        console.error("Error saving progress to IndexedDB:", e);
+    const current = latestProgressRef.current;
+    const now = Date.now();
+
+    try {
+      isSavingRef.current = true;
+      hasPendingSaveRef.current = false;
+
+      const currentSource = data.sourceId || sourceParam || "komiku";
+
+      // 1. Put into db.readingProgress
+      await db.readingProgress.put({
+        chapterId: chapterSlug,
+        mangaId: effectiveMangaId || undefined,
+        sourceId: currentSource,
+        pageIndex: current.pageIndex,
+        scrollPercent: current.scrollPercent,
+        updatedAt: now,
+      });
+
+      // 2. Put into db.history
+      if (effectiveMangaId) {
+        const existingHistory = await db.history.get(effectiveMangaId);
+        const title = existingHistory?.title || mangaMeta.title || data.title;
+        const thumbnail =
+          existingHistory?.thumbnail ||
+          existingHistory?.cover ||
+          mangaMeta.cover ||
+          "/placeholder.jpg";
+        const cover = existingHistory?.cover || mangaMeta.cover || thumbnail;
+
+        await db.history.put({
+          id: effectiveMangaId,
+          title,
+          cover,
+          thumbnail,
+          lastChapterId: chapterSlug,
+          lastChapterTitle: data.title,
+          lastReadAt: now,
+          sourceId: currentSource,
+          progress: current.scrollPercent,
+          pageIndex: current.pageIndex,
+          totalPage: pages.length,
+        });
       }
+
+      // 3. Dispatch real-time events for Home, Library, and MangaDetail
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("void_reading_progress_updated", {
+            detail: {
+              mangaId: effectiveMangaId,
+              chapterSlug,
+              scrollPercent: current.scrollPercent,
+              pageIndex: current.pageIndex,
+              lastReadAt: now,
+              sourceId: currentSource,
+            },
+          })
+        );
+        try {
+          const bc = new BroadcastChannel("void_reader_sync");
+          bc.postMessage({
+            type: "progress_updated",
+            mangaId: effectiveMangaId,
+            chapterSlug,
+            scrollPercent: current.scrollPercent,
+            lastReadAt: now,
+            sourceId: currentSource,
+          });
+          bc.close();
+        } catch {
+          // BroadcastChannel optional
+        }
+      }
+    } catch (e) {
+      console.error("[Reader] Error saving progress to IndexedDB:", e);
+    } finally {
+      isSavingRef.current = false;
+      if (hasPendingSaveRef.current) {
+        executeSave();
+      }
+    }
+  }, [chapterSlug, data, effectiveMangaId, mangaMeta, pages.length, sourceParam]);
+
+  // Debounced progress saver
+  const scheduleSave = useCallback(
+    (pageIdx: number, scrollPct: number) => {
+      if (!isRestoredRef.current) return;
+
+      latestProgressRef.current.pageIndex = pageIdx;
+      latestProgressRef.current.scrollPercent = scrollPct;
+
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+
+      hasPendingSaveRef.current = true;
+      saveTimerRef.current = setTimeout(() => {
+        executeSave();
+      }, 400);
     },
-    [chapterSlug, data, effectiveMangaId]
+    [executeSave]
   );
+
+  // Flush any pending progress immediately
+  const flushProgress = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (hasPendingSaveRef.current || !isSavingRef.current) {
+      await executeSave();
+    }
+  }, [executeSave]);
+
+  const handleNavigateHome = useCallback(async () => {
+    await flushProgress();
+    router.push("/");
+  }, [flushProgress, router]);
+
+  const handleNavigateBack = useCallback(async () => {
+    await flushProgress();
+    if (mangaId) {
+      router.push(`/manga/${mangaId}${sourceQueryParam}`);
+    } else {
+      router.back();
+    }
+  }, [flushProgress, mangaId, router, sourceQueryParam]);
 
   // Helper to persist reader preferences to IndexedDB
   const saveReaderPrefs = useCallback(
@@ -459,7 +580,59 @@ function ReaderPageContent() {
     });
   }, [resetAutoHideTimer]);
 
-  // 3. Scroll tracking for vertical mode
+  // 3. Restore saved reading progress once chapter data and pages are loaded
+  useEffect(() => {
+    if (!chapterSlug || !data || pages.length === 0) return;
+
+    let isMounted = true;
+    async function restoreProgress() {
+      try {
+        const saved = await db.readingProgress.get(chapterSlug);
+        if (saved && isMounted) {
+          const targetPage = Math.max(0, Math.min(saved.pageIndex, pages.length - 1));
+          const targetPercent = Math.max(0, Math.min(saved.scrollPercent, 100));
+
+          setCurrentPageIndex(targetPage);
+          setScrollProgress(targetPercent);
+
+          latestProgressRef.current.pageIndex = targetPage;
+          latestProgressRef.current.scrollPercent = targetPercent;
+
+          if (mode === "vertical" && (targetPage > 0 || targetPercent > 0)) {
+            // Restore vertical scroll position after DOM renders images
+            setTimeout(() => {
+              if (!isMounted) return;
+              const targetEl = pageRefs.current[targetPage];
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+              } else if (targetPercent > 0) {
+                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                if (docHeight > 0) {
+                  window.scrollTo({
+                    top: (targetPercent / 100) * docHeight,
+                    behavior: "smooth",
+                  });
+                }
+              }
+            }, 350);
+          }
+        }
+      } catch (err) {
+        console.warn("[Reader] Gagal memulihkan progres membaca:", err);
+      } finally {
+        if (isMounted) {
+          isRestoredRef.current = true;
+        }
+      }
+    }
+
+    restoreProgress();
+    return () => {
+      isMounted = false;
+    };
+  }, [chapterSlug, data, pages.length, mode]);
+
+  // 4. Scroll tracking for vertical mode
   useEffect(() => {
     if (mode !== "vertical") return;
 
@@ -467,7 +640,7 @@ function ReaderPageContent() {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
       const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
+      const progress = docHeight > 0 ? Math.min(100, Math.max(0, Math.round((scrollTop / docHeight) * 100))) : 0;
       setScrollProgress(progress);
 
       // Auto-hide HUD on downward scroll
@@ -477,23 +650,55 @@ function ReaderPageContent() {
       lastScrollTop = scrollTop;
 
       // Track current visible page
+      let pageIdx = currentPageIndex;
       pageRefs.current.forEach((el, index) => {
         if (!el) return;
         const rect = el.getBoundingClientRect();
         if (rect.top <= window.innerHeight / 2 && rect.bottom >= window.innerHeight / 2) {
-          setCurrentPageIndex(index);
+          pageIdx = index;
         }
       });
+      if (progress >= 98 && pages.length > 0) {
+        pageIdx = pages.length - 1;
+      }
+      setCurrentPageIndex(pageIdx);
+      scheduleSave(pageIdx, progress);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [mode]);
+  }, [mode, pages.length, currentPageIndex, scheduleSave]);
 
-  // Auto-save on page index change
+  // 5. Paged mode progress tracking
   useEffect(() => {
-    saveProgress(currentPageIndex, scrollProgress);
-  }, [currentPageIndex, scrollProgress, saveProgress]);
+    if (mode !== "paged" || !isRestoredRef.current || pages.length === 0) return;
+    const progress = Math.min(100, Math.round(((currentPageIndex + 1) / pages.length) * 100));
+    setScrollProgress(progress);
+    scheduleSave(currentPageIndex, progress);
+  }, [mode, currentPageIndex, pages.length, scheduleSave]);
+
+  // 6. Save progress when leaving page, switching tabs, or unmounting
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushProgress();
+      }
+    };
+    const handleBeforeUnload = () => {
+      flushProgress();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      flushProgress();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushProgress]);
 
   // Toggle Fullscreen
   const toggleFullscreen = () => {
@@ -564,12 +769,21 @@ function ReaderPageContent() {
         <p className="text-sm text-gray-400 max-w-md mb-6">
           {error || "Tidak ada gambar yang dapat ditampilkan untuk chapter ini."}
         </p>
-        <button
-          onClick={() => (mangaId ? router.push(`/manga/${mangaId}`) : router.back())}
-          className="px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-all"
-        >
-          Kembali ke Detail
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => (mangaId ? router.push(`/manga/${mangaId}`) : router.back())}
+            className="px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-all"
+          >
+            Kembali ke Detail
+          </button>
+          <Link
+            href="/"
+            className="px-5 py-2.5 rounded-xl bg-[#111827] text-white border border-white/10 hover:border-cyan-500/30 font-semibold text-sm transition-all flex items-center gap-2"
+          >
+            <Home className="w-4 h-4 text-[#00E5FF]" />
+            <span>Beranda</span>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -593,18 +807,18 @@ function ReaderPageContent() {
       onClick={toggleHUD}
       className={`min-h-screen ${bgThemeClasses} select-none relative transition-colors duration-300`}
     >
-      {/* Schema.org ComicIssue Structured Data */}
+      {/* Schema.org ComicIssue Structured Data with XSS sanitization */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: safeJsonLdStringify({
             "@context": "https://schema.org",
             "@type": "ComicIssue",
-            name: data.title,
-            headline: `${data.title} Bahasa Indonesia`,
+            name: sanitizeMetadataString(data.title),
+            headline: `${sanitizeMetadataString(data.title)} Bahasa Indonesia`,
             isPartOf: {
               "@type": "ComicSeries",
-              name: effectiveMangaId,
+              name: sanitizeMetadataString(effectiveMangaId),
             },
             numberOfPages: pages.length,
             inLanguage: "id-ID",
@@ -635,15 +849,27 @@ function ReaderPageContent() {
       >
         <div className="bg-[#080B14]/90 backdrop-blur-md border-b border-cyan-500/20 px-4 py-3 pointer-events-auto shadow-xl">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-            {/* Back Button & Title */}
-            <div className="flex items-center gap-3 min-w-0">
+            {/* Back Button, Home Button & Title */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <button
-                onClick={() => (mangaId ? router.push(`/manga/${mangaId}`) : router.back())}
-                className="p-2 rounded-xl bg-[#111827] text-gray-300 hover:text-[#00E5FF] hover:border-cyan-500/40 border border-white/5 transition-all"
+                onClick={handleNavigateBack}
+                className="p-2 rounded-xl bg-[#111827] text-gray-300 hover:text-[#00E5FF] hover:border-cyan-500/40 border border-white/5 transition-all shrink-0"
                 title="Kembali"
+                aria-label="Kembali"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
+
+              <button
+                onClick={handleNavigateHome}
+                className="p-2 rounded-xl bg-[#111827] text-gray-300 hover:text-[#00E5FF] hover:border-cyan-500/40 border border-white/5 transition-all shrink-0 flex items-center gap-1.5"
+                title="Beranda"
+                aria-label="Kembali ke Beranda"
+              >
+                <Home className="w-4 h-4 text-[#00E5FF]" />
+                <span className="hidden md:inline text-xs font-semibold">Beranda</span>
+              </button>
+
               <div className="min-w-0">
                 <h1 className="text-sm font-bold text-white truncate">{data.title}</h1>
                 <div className="flex items-center gap-2 text-[11px] text-gray-400">

@@ -68,6 +68,7 @@ function ExploreContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
   const initialGenre = searchParams.get("genre") || "";
+  const initialSort = searchParams.get("sort") || "popular";
   const rawParamSource = searchParams.get("source");
   const validParamSource =
     rawParamSource && AVAILABLE_SOURCES.some((s) => s.id === rawParamSource && s.id !== "lunar")
@@ -79,7 +80,7 @@ function ExploreContent() {
   const [selectedGenre, setSelectedGenre] = useState(initialGenre);
   const [selectedType, setSelectedType] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [selectedSort, setSelectedSort] = useState("popular");
+  const [selectedSort, setSelectedSort] = useState(initialSort);
   const [selectedSource, setSelectedSource] = useState(initialSource);
   const [results, setResults] = useState<MangaItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -374,6 +375,8 @@ function ExploreContent() {
               ? `Hasil Pencarian "${query}"`
               : selectedGenre
               ? `Genre: ${selectedGenre}`
+              : selectedSort === "latest"
+              ? "Update Chapter Terbaru (Ch Baru ➜ Lama)"
               : "Koleksi Terpopuler"}
           </h2>
           <span className="text-xs text-cyan-400 font-mono px-2 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-500/30">
@@ -407,7 +410,7 @@ function ExploreContent() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
           {results.map((manga) => (
-            <MangaCard key={manga.id} manga={manga} />
+            <MangaCard key={`${manga.sourceId || "src"}-${manga.id}`} manga={manga} />
           ))}
         </div>
       )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserFollowRecord, db } from "@/lib/db";
 import { getFollowedList, unfollowManga } from "@/lib/follows";
 import { AVAILABLE_SOURCES } from "@/lib/source-storage";
+import { getBestMangaCover } from "@/lib/image-utils";
 import { TopupBanner } from "@/components/ads/TopupBanner";
 import {
   Heart,
@@ -120,12 +121,14 @@ export default function FollowingPage() {
                   className="w-20 sm:w-24 aspect-[3/4.2] rounded-xl overflow-hidden bg-gray-900 shrink-0 border border-white/10 group-hover:border-cyan-500/40 transition-colors"
                 >
                   <img
-                    src={item.cover || "/placeholder.jpg"}
+                    src={getBestMangaCover(item, item.sourceId)}
                     alt={item.title}
                     referrerPolicy="no-referrer"
                     onError={(e) => {
                       const target = e.currentTarget;
-                      if (target.src !== "/placeholder.jpg") {
+                      if (!target.src.includes("/api/proxy/image") && !target.src.startsWith("/") && !target.src.includes("placeholder.jpg")) {
+                        target.src = `/api/proxy/image?url=${encodeURIComponent(target.src)}`;
+                      } else if (!target.src.endsWith("/placeholder.jpg")) {
                         target.src = "/placeholder.jpg";
                       }
                     }}

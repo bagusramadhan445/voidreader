@@ -12,6 +12,7 @@ import { OfflineManager } from "@/lib/offline";
 import { DonationCard } from "@/components/support/DonationCard";
 import { getCurrentUser, onAuthStateChange } from "@/lib/supabase/auth";
 import { syncLocalToCloud, getLastSyncTime } from "@/lib/supabase/sync";
+import { getBestMangaCover } from "@/lib/image-utils";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import {
   Bookmark,
@@ -71,8 +72,13 @@ export default function LibraryPage() {
       setUser(newUser);
     });
 
+    window.addEventListener("void_reading_progress_updated", loadData);
+    window.addEventListener("focus", loadData);
+
     return () => {
       authSub?.subscription?.unsubscribe();
+      window.removeEventListener("void_reading_progress_updated", loadData);
+      window.removeEventListener("focus", loadData);
     };
   }, []);
 
@@ -281,12 +287,14 @@ export default function LibraryPage() {
                     <Link href={`/manga/${item.id}`} className="block">
                       <div className="aspect-[3/4.2] w-full overflow-hidden bg-gray-900 relative">
                         <img
-                          src={item.cover || item.thumbnail || "/placeholder.jpg"}
+                          src={getBestMangaCover(item, item.sourceId)}
                           alt={item.title || "Cover Bookmark"}
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (target.src !== "/placeholder.jpg") {
+                            if (!target.src.includes("/api/proxy/image") && !target.src.startsWith("/") && !target.src.includes("placeholder.jpg")) {
+                              target.src = `/api/proxy/image?url=${encodeURIComponent(target.src)}`;
+                            } else if (!target.src.endsWith("/placeholder.jpg")) {
                               target.src = "/placeholder.jpg";
                             }
                           }}
@@ -356,12 +364,14 @@ export default function LibraryPage() {
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-12 h-16 rounded-xl overflow-hidden bg-gray-800 shrink-0 border border-white/5">
                         <img
-                          src={item.cover || item.thumbnail || "/placeholder.jpg"}
+                          src={getBestMangaCover(item, item.sourceId)}
                           alt={item.title || "Cover Riwayat"}
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (target.src !== "/placeholder.jpg") {
+                            if (!target.src.includes("/api/proxy/image") && !target.src.startsWith("/") && !target.src.includes("placeholder.jpg")) {
+                              target.src = `/api/proxy/image?url=${encodeURIComponent(target.src)}`;
+                            } else if (!target.src.endsWith("/placeholder.jpg")) {
                               target.src = "/placeholder.jpg";
                             }
                           }}
@@ -377,6 +387,11 @@ export default function LibraryPage() {
                         </Link>
                         <p className="text-xs text-cyan-400 mt-0.5 font-medium truncate">
                           Terakhir: {item.lastChapterTitle}
+                          {typeof item.progress === "number" && (
+                            <span className="text-gray-400 ml-2 font-mono">
+                              ({Math.round(item.progress)}%)
+                            </span>
+                          )}
                         </p>
                         <span className="text-[10px] text-gray-500 block mt-1">
                           Dibaca: {new Date(item.lastReadAt).toLocaleDateString("id-ID")}
@@ -386,7 +401,9 @@ export default function LibraryPage() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <Link
-                        href={`/reader/${item.lastChapterId}?manga=${item.id}`}
+                        href={`/reader/${item.lastChapterId}?manga=${item.id}${
+                          item.sourceId ? `&source=${item.sourceId}` : ""
+                        }`}
                         className="px-4 py-2 rounded-xl bg-[#00E5FF] hover:bg-cyan-300 text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(0,229,255,0.3)]"
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />

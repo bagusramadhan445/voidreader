@@ -1,5 +1,5 @@
 /**
- * Supabase Database & Entity Types for Void Reader
+ * Supabase Database & Entity Types for Void Verse
  */
 
 export interface Profile {

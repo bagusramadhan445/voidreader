@@ -3,6 +3,7 @@ export interface MangaItem {
   slug?: string; // alias for id
   title: string;
   cover: string; // Valid image URL (required by spec)
+  coverUrl?: string; // Normalized alias
   thumbnail: string; // Maintained for backwards compatibility
   image?: string; // Additional alias
   poster?: string; // Additional alias
@@ -34,6 +35,7 @@ export interface MangaDetail {
   title: string;
   alternativeTitle?: string;
   cover: string;
+  coverUrl?: string; // Normalized alias
   image?: string;
   thumbnail: string;
   poster?: string;

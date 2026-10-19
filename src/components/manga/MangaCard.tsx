@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { MangaItem } from "@/lib/sources";
-import { normalizeImageUrl } from "@/lib/image-utils";
+import { getMangaCoverCandidates } from "@/lib/image-utils";
 import { Sparkles } from "lucide-react";
 
 interface MangaCardProps {
@@ -12,27 +12,36 @@ interface MangaCardProps {
 }
 
 export const MangaCard: React.FC<MangaCardProps> = ({ manga }) => {
-  const rawCoverImage = normalizeImageUrl(
-    manga.cover ||
-    manga.thumbnail ||
-    manga.poster ||
-    manga.banner
-  );
-  const [imgSrc, setImgSrc] = useState(rawCoverImage);
-  const [hasProxied, setHasProxied] = useState(false);
+  const candidates = getMangaCoverCandidates(manga, manga.sourceId);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [isProxied, setIsProxied] = useState(false);
+
+  const currentCandidate = candidates[candidateIndex] || "/placeholder.jpg";
+  const imgSrc =
+    isProxied && !currentCandidate.startsWith("/") && !currentCandidate.startsWith("/placeholder")
+      ? `/api/proxy/image?url=${encodeURIComponent(currentCandidate)}`
+      : currentCandidate;
 
   useEffect(() => {
-    setImgSrc(rawCoverImage);
-    setHasProxied(false);
-  }, [rawCoverImage]);
+    setCandidateIndex(0);
+    setIsProxied(false);
+  }, [manga.id, manga.cover, manga.thumbnail, manga.sourceId]);
 
   const handleImageError = () => {
-    if (!hasProxied && rawCoverImage && !rawCoverImage.startsWith("/") && !rawCoverImage.startsWith("/placeholder")) {
-      setHasProxied(true);
-      setImgSrc(`/api/proxy/image?url=${encodeURIComponent(rawCoverImage)}`);
-    } else {
-      setImgSrc("/placeholder.jpg");
+    // 1. If currently direct and not yet proxied, try image proxy
+    if (!isProxied && !currentCandidate.startsWith("/") && !currentCandidate.startsWith("/placeholder")) {
+      setIsProxied(true);
+      return;
     }
+    // 2. If proxy failed or already tried, advance to next candidate
+    if (candidateIndex + 1 < candidates.length) {
+      setCandidateIndex((prev) => prev + 1);
+      setIsProxied(false);
+      return;
+    }
+    // 3. All candidates exhausted => fallback to placeholder
+    setCandidateIndex(candidates.length);
+    setIsProxied(false);
   };
 
   // Debug log required by spec
@@ -71,15 +80,30 @@ export const MangaCard: React.FC<MangaCardProps> = ({ manga }) => {
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between gap-1 pointer-events-none">
-          {manga.type && (
-            <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm uppercase tracking-wider ${getTypeColor(
-                manga.type
-              )}`}
-            >
-              {manga.type}
-            </span>
-          )}
+          <div className="flex items-center gap-1">
+            {manga.sourceId && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/75 border border-cyan-500/30 text-cyan-300 backdrop-blur-md uppercase tracking-wider">
+                {manga.sourceId === "komiku"
+                  ? "Komiku"
+                  : manga.sourceId === "komikcast"
+                  ? "Cast"
+                  : manga.sourceId === "shinigami"
+                  ? "Shini"
+                  : manga.sourceId === "webtoon"
+                  ? "Webtoon"
+                  : manga.sourceId}
+              </span>
+            )}
+            {manga.type && (
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border backdrop-blur-md shadow-sm uppercase tracking-wider ${getTypeColor(
+                  manga.type
+                )}`}
+              >
+                {manga.type}
+              </span>
+            )}
+          </div>
 
           {manga.rating && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 backdrop-blur-md flex items-center gap-0.5">

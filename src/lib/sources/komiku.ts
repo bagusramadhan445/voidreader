@@ -514,15 +514,15 @@ export class KomikuSource implements MangaSource {
       const rawSrc = extractImageFromElement(img);
       if (!rawSrc) return;
 
-      // Filter ads & banners
+      // Filter ads & banners (ensure not to match 'uploads')
       if (
         rawSrc.includes("promosi") ||
         rawSrc.includes("banner") ||
-        rawSrc.includes("ads") ||
         rawSrc.includes("iklan") ||
         rawSrc.includes("google.svg") ||
         rawSrc.includes("gravatar") ||
-        rawSrc.includes("/asset/img/")
+        rawSrc.includes("/asset/img/") ||
+        /(?:^|[/._?#-])ads(?:[/._?#-]|[\d]+|$)/i.test(rawSrc)
       ) {
         return;
       }
@@ -664,7 +664,9 @@ export class KomikuSource implements MangaSource {
       sourceId: this.id,
     };
 
-    appCache.set(cacheKey, chapterData, 900); // 15 min cache
+    if (pages.length > 0) {
+      appCache.set(cacheKey, chapterData, 900); // 15 min cache
+    }
     return chapterData;
   }
 }

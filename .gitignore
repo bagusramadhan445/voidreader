@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tool & provider configs containing server secrets
+.void_tools_config.json
+.downloader_provider_config.json
+
+# temporary scratch tests
+/scratch/
+

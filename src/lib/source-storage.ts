@@ -13,6 +13,13 @@ export interface SourceOption {
 
 export const AVAILABLE_SOURCES: SourceOption[] = [
   {
+    id: "all",
+    label: "Semua Sumber",
+    name: "Semua Sumber (Multi-Source)",
+    badge: "200+",
+    description: "Update terbaru 200 komik dari seluruh server (Komiku, Komikcast, Shinigami, Webtoon)",
+  },
+  {
     id: "komiku",
     label: "Komiku ID",
     name: "Komiku Indonesia",

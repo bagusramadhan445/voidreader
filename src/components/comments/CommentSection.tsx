@@ -192,7 +192,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
               </span>
             </h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Diskusikan alur cerita dan teori bersama komunitas Void Reader
+              Diskusikan alur cerita dan teori bersama komunitas Void Verse
             </p>
           </div>
         </div>

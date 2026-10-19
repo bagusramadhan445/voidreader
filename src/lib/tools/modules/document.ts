@@ -1,0 +1,301 @@
+import { ToolDefinition } from "../types";
+
+export const documentTools: ToolDefinition[] = [
+  {
+    id: "pdf-converter",
+    name: "PDF Converter",
+    description: "Konversi gambar chapter komik, teks Markdown, atau naskah menjadi dokumen PDF.",
+    longDescription:
+      "Ubah sekumpulan halaman komik atau naskah Markdown menjadi e-book PDF siap baca beresolusi tinggi dengan paginasi otomatis.",
+    categoryId: "document",
+    iconName: "FileSpreadsheet",
+    status: "popular",
+    badge: "pdf-lib",
+    tags: ["PDF", "Convert", "ImagesToPDF", "Ebook", "pdf-lib"],
+    inputs: [
+      {
+        id: "targetType",
+        label: "Jenis Konversi",
+        type: "select",
+        defaultValue: "md-to-pdf",
+        options: [
+          { label: "Markdown Teks ke Dokumen PDF (A4)", value: "md-to-pdf" },
+          { label: "Gambar Chapter ke Dokumen PDF", value: "images-to-pdf" },
+        ],
+      },
+      {
+        id: "docTitle",
+        label: "Judul Dokumen",
+        type: "text",
+        defaultValue: "Void Verse Volume 1",
+        required: true,
+      },
+      {
+        id: "content",
+        label: "Konten Teks Markdown (Untuk Markdown ke PDF)",
+        type: "textarea",
+        defaultValue: "# Bab 1: Pintu Gerbang Void\n\nDi kedalaman alam semesta, sebuah kekuatan kuno mulai bangkit.\n\n## Subbab 1.1\nSeluruh sistem telah terhubung dengan aman.",
+      },
+      {
+        id: "imageUrls",
+        label: "Daftar URL Gambar (Satu per baris, Untuk Gambar ke PDF)",
+        type: "textarea",
+        placeholder: "https://example.com/page1.jpg\nhttps://example.com/page2.jpg",
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "pdf-compressor",
+    name: "PDF Compressor",
+    description: "Kecilkan ukuran file PDF dokumen dengan optimasi kompresi Object Streams.",
+    longDescription:
+      "Kurangi ukuran file PDF manga atau dokumen naskah yang terlalu besar menggunakan kompresi stream tanpa merusak struktur halaman.",
+    categoryId: "document",
+    iconName: "FileArchive",
+    status: "ready",
+    badge: "Streams",
+    tags: ["Compress", "PDF", "ReduceSize", "Optimized"],
+    inputs: [
+      {
+        id: "pdfSource",
+        label: "URL Berkas PDF atau Data URI (Kosongkan untuk menguji sampel dokumen)",
+        type: "text",
+        placeholder: "https://... atau data:application/pdf;base64,...",
+      },
+      {
+        id: "compressionLevel",
+        label: "Tingkat Kompresi",
+        type: "select",
+        defaultValue: "medium",
+        options: [
+          { label: "Seimbang (Object Streams Optimization)", value: "medium" },
+          { label: "Maksimal (FlateDecode Compact)", value: "high" },
+        ],
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "pdf-merger",
+    name: "PDF Merger",
+    description: "Gabungkan beberapa berkas PDF terpisah menjadi satu dokumen utuh terpadu.",
+    longDescription:
+      "Satukan beberapa file chapter PDF menjadi satu volume manga utuh dengan menggabungkan halaman-halamannya secara berurutan.",
+    categoryId: "document",
+    iconName: "Files",
+    status: "popular",
+    badge: "Merge",
+    tags: ["Merge", "Combine", "Volume", "PDF"],
+    inputs: [
+      {
+        id: "pdfSources",
+        label: "URL Berkas PDF (Satu per baris, kosongkan untuk menguji gabung 2 chapter sampel)",
+        type: "textarea",
+        placeholder: "https://example.com/ch1.pdf\nhttps://example.com/ch2.pdf",
+      },
+      {
+        id: "outputFileName",
+        label: "Nama File Hasil",
+        type: "text",
+        defaultValue: "Combined_Volume_01.pdf",
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "pdf-splitter",
+    name: "PDF Splitter",
+    description: "Pisahkan dokumen PDF besar menjadi beberapa bagian atau perorangan halaman.",
+    longDescription:
+      "Ekstrak halaman tertentu dari PDF komik atau pisahkan bab-bab manga menjadi file independen yang terverifikasi.",
+    categoryId: "document",
+    iconName: "FileMinus",
+    status: "ready",
+    tags: ["Split", "ExtractPages", "PDF", "Range"],
+    inputs: [
+      {
+        id: "pdfSource",
+        label: "URL Berkas PDF atau Data URI (Kosongkan untuk menguji sampel dokumen)",
+        type: "text",
+        placeholder: "https://... atau data:application/pdf;base64,...",
+      },
+      {
+        id: "pageRange",
+        label: "Rentang Halaman (Contoh: 1-2 atau 1,2)",
+        type: "text",
+        defaultValue: "1-2",
+        required: true,
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "pdf-ocr-scanner",
+    name: "PDF OCR Scanner",
+    description: "Pindai dokumen PDF hasil scan dan kenali teks menggunakan model OCR visual.",
+    longDescription:
+      "Mengenali teks alfabet dan aksara Asia dari halaman PDF scan menggunakan engine OCR visual.",
+    categoryId: "document",
+    iconName: "ScanText",
+    status: "api-required",
+    badge: "Vision OCR",
+    tags: ["OCR", "SearchablePDF", "TextExtraction", "Scan"],
+    requiresApiKey: "gemini",
+    inputs: [
+      {
+        id: "language",
+        label: "Bahasa Dokumen",
+        type: "select",
+        defaultValue: "ind",
+        options: [
+          { label: "Bahasa Indonesia", value: "ind" },
+          { label: "English", value: "eng" },
+          { label: "Japanese (Kanji/Kana)", value: "jpn" },
+          { label: "Korean (Hangul)", value: "kor" },
+        ],
+      },
+      {
+        id: "pdfSource",
+        label: "URL Dokumen PDF",
+        type: "text",
+        placeholder: "https://...",
+        required: true,
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "document-summarizer",
+    name: "Document Summarizer",
+    description: "Ekstrak intisari eksekutif, bab-bab kunci, dan kesimpulan dari berkas dokumen.",
+    longDescription:
+      "Analisis naskah skenario atau dokumen dengan ekstraksi kalimat terpenting berdasarkan frekuensi istilah (TF-IDF).",
+    categoryId: "document",
+    iconName: "FileText",
+    status: "popular",
+    badge: "Extractive NLP",
+    tags: ["DocumentSummary", "ExecutiveSummary", "KeyFindings", "NLP"],
+    inputs: [
+      {
+        id: "docText",
+        label: "Konten Dokumen / Naskah",
+        type: "textarea",
+        defaultValue:
+          "Void Verse merupakan platform pembaca komik generasi berikutnya dengan keamanan tingkat tinggi. Sistem ini mengintegrasikan perlindungan SSRF, otorisasi berbasis sesi kriptografis, dan sanitasi konten secara otomatis. Selain itu, ekosistem utilitas terpadu Void Tools menyediakan enam puluh alat bantu untuk mempermudah alur kerja pengguna. Arsitektur modular yang diterapkan memastikan penambahan modul baru dapat dilakukan secara fleksibel tanpa mengorbankan performa sistem.",
+        required: true,
+      },
+    ],
+    outputType: "text",
+  },
+  {
+    id: "markdown-converter",
+    name: "Markdown Converter",
+    description: "Ubah Markdown menjadi HTML bersih, teks tebal, atau format dokumen siap cetak.",
+    longDescription:
+      "Editor dan konverter Markdown dengan dukungan sintaks tabel, kutipan, dan kode blok.",
+    categoryId: "document",
+    iconName: "FileCode2",
+    status: "popular",
+    badge: "Gfm Parser",
+    tags: ["Markdown", "HTML", "Convert", "Preview"],
+    inputs: [
+      {
+        id: "markdownText",
+        label: "Teks Markdown (GitHub Flavored)",
+        type: "textarea",
+        defaultValue: `# VoidVerse Project\n\nSelamat datang di **Void Tools**!\n\n- Ekosistem utilitas terpadu\n- *30 Alat Subsystem Terverifikasi*\n- Terintegrasi sempurna dengan arsitektur Void Verse.`,
+        required: true,
+      },
+      {
+        id: "outputMode",
+        label: "Format Keluaran",
+        type: "select",
+        defaultValue: "html",
+        options: [
+          { label: "HTML Tag Bersih", value: "html" },
+          { label: "Plain Text Tanpa Format", value: "plain" },
+        ],
+      },
+    ],
+    outputType: "code",
+    outputLanguage: "html",
+  },
+  {
+    id: "file-previewer",
+    name: "File Previewer",
+    description: "Pratinjau konten berkas teks, JSON, gambar, SVG, dan Markdown langsung di browser.",
+    longDescription:
+      "Buka dan periksa isi berkas dengan indentasi kode dan deteksi sintaks otomatis.",
+    categoryId: "document",
+    iconName: "Eye",
+    status: "ready",
+    tags: ["Preview", "Viewer", "FileInspection", "Browser"],
+    inputs: [
+      {
+        id: "fileUrlOrData",
+        label: "Data Berkas atau Cuplikan Konten",
+        type: "textarea",
+        defaultValue: `{\n  "app": "VoidVerse",\n  "module": "Void Tools",\n  "status": "Online",\n  "version": "2.0"\n}`,
+        required: true,
+      },
+    ],
+    outputType: "code",
+    outputLanguage: "json",
+  },
+  {
+    id: "file-metadata-viewer",
+    name: "File Metadata Viewer",
+    description: "Inspeksi ekstensi berkas, tipe MIME resmi, encoding karakter, dan analisis keamanan.",
+    longDescription:
+      "Periksa keaslian ekstensi file untuk mencegah berkas berbahaya, skrip tersembunyi, atau ekstensi ganda yang menyesatkan.",
+    categoryId: "document",
+    iconName: "FileQuestion",
+    status: "popular",
+    badge: "Security MIME",
+    tags: ["MIME", "FileExtension", "MagicBytes", "Security"],
+    inputs: [
+      {
+        id: "fileName",
+        label: "Nama Berkas Lengkap",
+        type: "text",
+        defaultValue: "demonic_emperor_ch925.cbz",
+        required: true,
+      },
+    ],
+    outputType: "json",
+  },
+  {
+    id: "document-translator",
+    name: "Document Translator",
+    description: "Terjemahkan seluruh struktur paragraf dokumen dengan mempertahankan format dan jeda alinea.",
+    longDescription:
+      "Menerjemahkan berkas teks atau naskah dialog komik secara utuh menggunakan model bahasa saraf.",
+    categoryId: "document",
+    iconName: "Languages",
+    status: "api-required",
+    badge: "AI Translation",
+    tags: ["DocumentTranslate", "PreserveFormat", "Localization"],
+    requiresApiKey: "openrouter",
+    inputs: [
+      {
+        id: "docContent",
+        label: "Konten Dokumen untuk Diterjemahkan",
+        type: "textarea",
+        defaultValue: "Chapter 1: The Awakening of the Void Monarch.\nIn the deepest abyss of the universe, a lost power began to stir.",
+        required: true,
+      },
+      {
+        id: "targetLang",
+        label: "Bahasa Sasaran",
+        type: "select",
+        defaultValue: "id",
+        options: [
+          { label: "Bahasa Indonesia", value: "id" },
+          { label: "English", value: "en" },
+        ],
+      },
+    ],
+    outputType: "text",
+  },
+];

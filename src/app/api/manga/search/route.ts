@@ -1,5 +1,7 @@
-import { sourceManager } from "@/lib/sources";
+import { sourceManager, parseChapterNumber } from "@/lib/sources";
 import { NextRequest, NextResponse } from "next/server";
+import { toSafeErrorMessage } from "@/lib/security/input-validator";
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -82,8 +84,17 @@ export async function GET(request: NextRequest) {
           return rB - rA;
         });
       } else if (sort === "latest") {
-        // preserve or prioritize items with recent updatedAt or latest chapter
+        // Prioritize newest chapter numbers first ("dari ch baru ke yang paling lama")
         data = [...data].sort((a, b) => {
+          const numA = parseChapterNumber(a.latestChapter);
+          const numB = parseChapterNumber(b.latestChapter);
+          if (numA !== null && numB !== null) {
+            if (numA !== numB) return numB - numA;
+          } else if (numA !== null && numB === null) {
+            return -1;
+          } else if (numA === null && numB !== null) {
+            return 1;
+          }
           if (a.updatedAt && b.updatedAt) {
             return b.updatedAt.localeCompare(a.updatedAt);
           }
@@ -99,11 +110,12 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error("[API /api/manga/search] Error:", error);
+    const message = toSafeErrorMessage(error, "Gagal melakukan pencarian komik. Silakan coba beberapa saat lagi.");
     return NextResponse.json(
       { success: false, error: message },
       { status: 500 }
     );
   }
 }
+

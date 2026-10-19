@@ -83,7 +83,7 @@ export const VoidLogo: React.FC<VoidLogoProps> = ({ size = "md", showText = true
           <span
             className={`font-black tracking-wider ${textMap[size]} text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-cyan-400 group-hover:to-cyan-300 transition-colors`}
           >
-            VOID<span className="text-[#00E5FF] ml-1 text-glow">READER</span>
+            VOID<span className="text-[#00E5FF] ml-1 text-glow">VERSE</span>
           </span>
           <span className="text-[10px] tracking-widest text-cyan-400/80 -mt-1 font-mono uppercase">
             Portal Manga ID

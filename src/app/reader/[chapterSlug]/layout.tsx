@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ chapterSl
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
-  const title = `Baca ${cleanTitle} Bahasa Indonesia - Void Reader`;
-  const description = `Baca komik ${cleanTitle} Bahasa Indonesia online di Void Reader dengan pengalaman visual interaktif, kualitas HD, dan fitur bookmark otomatis.`;
+  const title = `Baca ${cleanTitle} Bahasa Indonesia - Void Verse`;
+  const description = `Baca komik ${cleanTitle} Bahasa Indonesia online di Void Verse dengan pengalaman visual interaktif, kualitas HD, dan fitur bookmark otomatis.`;
 
   return {
     title,
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ chapterSl
       title,
       description,
       type: "article",
-      siteName: "Void Reader",
+      siteName: "Void Verse",
       locale: "id_ID",
     },
     twitter: {
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ chapterSl
       title,
       description,
     },
-    keywords: [cleanTitle, `${cleanTitle} bahasa indonesia`, "baca chapter", "reader", "void reader"],
+    keywords: [cleanTitle, `${cleanTitle} bahasa indonesia`, "baca chapter", "reader", "void verse"],
   };
 }
 

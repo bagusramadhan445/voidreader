@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MangaDetail } from "@/lib/sources";
+import { getMangaCoverCandidates, getBestMangaCover } from "@/lib/image-utils";
 import { ChapterList } from "@/components/manga/ChapterList";
 import { CommentSection } from "@/components/comments/CommentSection";
 import { MangaReviewSection } from "@/components/manga/MangaReviewSection";
@@ -104,8 +105,24 @@ export function MangaDetailClient({
 
     loadData();
 
+    const handleProgressUpdate = async () => {
+      try {
+        const historyItem = await db.history.get(slug);
+        if (isMounted && historyItem) {
+          setLastReadChapter(historyItem);
+        }
+      } catch (e) {
+        console.error("Error refreshing history in detail:", e);
+      }
+    };
+
+    window.addEventListener("void_reading_progress_updated", handleProgressUpdate);
+    window.addEventListener("focus", handleProgressUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("void_reading_progress_updated", handleProgressUpdate);
+      window.removeEventListener("focus", handleProgressUpdate);
     };
   }, [slug, sourceParam]);
 
@@ -118,11 +135,13 @@ export function MangaDetailClient({
           ? detail.chapters[detail.chapters.length - 1]?.title
           : undefined;
 
+      const bestCover = getBestMangaCover(detail, detail.sourceId || sourceParam);
+
       const nextStatus = await toggleFollow({
         sourceId: detail.sourceId,
         mangaId: detail.id,
         title: detail.title,
-        cover: detail.cover || detail.thumbnail,
+        cover: bestCover,
         lastChapter: lastReadChapter?.lastChapterTitle,
         latestChapter: latestChTitle,
       });
@@ -145,10 +164,12 @@ export function MangaDetailClient({
             ? detail.chapters[detail.chapters.length - 1]?.title
             : undefined;
 
+        const bestCover = getBestMangaCover(detail, detail.sourceId || sourceParam);
+
         await db.bookmarks.put({
           id: detail.id,
           title: detail.title,
-          thumbnail: detail.thumbnail,
+          thumbnail: bestCover,
           type: detail.type,
           latestChapter: latestChTitle,
           sourceId: detail.sourceId,
@@ -168,8 +189,8 @@ export function MangaDetailClient({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${detail.title} - Void Reader`,
-          text: `Baca komik ${detail.title} Bahasa Indonesia di Void Reader`,
+          title: `${detail.title} - Void Verse`,
+          text: `Baca komik ${detail.title} Bahasa Indonesia di Void Verse`,
           url,
         });
       } catch {
@@ -210,6 +231,37 @@ export function MangaDetailClient({
   // If user has history, continue that. Otherwise, start from oldest chapter (Chapter 1)
   const firstChapter =
     detail.chapters.length > 0 ? detail.chapters[0] : null;
+  const coverCandidates = detail
+    ? getMangaCoverCandidates(detail, detail.sourceId || sourceParam)
+    : ["/placeholder.jpg"];
+  const [coverIndex, setCoverIndex] = useState(0);
+  const [coverProxied, setCoverProxied] = useState(false);
+
+  const currentCover = coverCandidates[coverIndex] || "/placeholder.jpg";
+  const displayCover =
+    coverProxied && !currentCover.startsWith("/") && !currentCover.startsWith("/placeholder")
+      ? `/api/proxy/image?url=${encodeURIComponent(currentCover)}`
+      : currentCover;
+
+  useEffect(() => {
+    setCoverIndex(0);
+    setCoverProxied(false);
+  }, [detail?.id, detail?.cover, detail?.thumbnail]);
+
+  const handleCoverError = () => {
+    if (!coverProxied && !currentCover.startsWith("/") && !currentCover.startsWith("/placeholder")) {
+      setCoverProxied(true);
+      return;
+    }
+    if (coverIndex + 1 < coverCandidates.length) {
+      setCoverIndex((prev) => prev + 1);
+      setCoverProxied(false);
+      return;
+    }
+    setCoverIndex(coverCandidates.length);
+    setCoverProxied(false);
+  };
+
   const targetChapter = lastReadChapter
     ? { id: lastReadChapter.lastChapterId, title: lastReadChapter.lastChapterTitle }
     : firstChapter;
@@ -220,15 +272,10 @@ export function MangaDetailClient({
       <div className="relative w-full overflow-hidden">
         <div className="absolute inset-0 h-[480px] z-0 pointer-events-none">
           <img
-            src={detail.cover || detail.thumbnail || "/placeholder.jpg"}
+            src={displayCover}
             alt={detail.title || "Backdrop Manga"}
             referrerPolicy="no-referrer"
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (target.src !== "/placeholder.jpg") {
-                target.src = "/placeholder.jpg";
-              }
-            }}
+            onError={handleCoverError}
             className="w-full h-full object-cover filter blur-3xl opacity-20 scale-125"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#080B14]/80 via-[#080B14]/95 to-[#080B14]" />
@@ -252,15 +299,10 @@ export function MangaDetailClient({
             <div className="w-48 sm:w-56 md:w-64 shrink-0 mx-auto md:mx-0">
               <div className="relative aspect-[3/4.2] rounded-2xl overflow-hidden border border-cyan-500/20 shadow-2xl shadow-cyan-950/40 bg-[#111827]">
                 <img
-                  src={detail.cover || detail.thumbnail || "/placeholder.jpg"}
+                  src={displayCover}
                   alt={detail.title || "Poster Manga"}
                   referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (target.src !== "/placeholder.jpg") {
-                      target.src = "/placeholder.jpg";
-                    }
-                  }}
+                  onError={handleCoverError}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute top-3 left-3">

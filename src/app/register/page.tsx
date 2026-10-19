@@ -84,7 +84,7 @@ function RegisterForm() {
           <VoidLogo size="lg" />
         </Link>
         <p className="text-sm text-gray-400 mt-2">
-          Portal Sinkronisasi Cloud & Komunitas Void Reader
+          Portal Sinkronisasi Cloud & Komunitas Void Verse
         </p>
       </div>
 

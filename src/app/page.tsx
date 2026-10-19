@@ -8,7 +8,7 @@ import { MangaCarousel } from "@/components/manga/MangaCarousel";
 import { MangaCard } from "@/components/manga/MangaCard";
 import { TopupBanner } from "@/components/ads/TopupBanner";
 import { DonationCard } from "@/components/support/DonationCard";
-import { normalizeImageUrl } from "@/lib/image-utils";
+import { getBestMangaCover } from "@/lib/image-utils";
 import { db, HistoryRecord } from "@/lib/db";
 import {
   AVAILABLE_SOURCES,
@@ -62,17 +62,74 @@ export default function HomePage() {
     }
   }, []);
 
-  // Fetch Last Read from Local IndexedDB
+  // Fetch Last Read from Local IndexedDB with exact reading progress
   const fetchLastRead = useCallback(async () => {
     try {
       const latest = await db.history.orderBy("lastReadAt").reverse().first();
       if (latest) {
-        setLastRead(latest);
+        let progress = typeof latest.progress === "number" ? latest.progress : 0;
+        try {
+          const progRecord = await db.readingProgress.get(latest.lastChapterId);
+          if (progRecord && typeof progRecord.scrollPercent === "number") {
+            progress = progRecord.scrollPercent;
+          }
+        } catch {
+          // fallback to latest.progress
+        }
+
+        setLastRead({
+          ...latest,
+          progress,
+        });
+      } else {
+        setLastRead(null);
       }
     } catch (err) {
       console.error("Error reading history from IndexedDB:", err);
     }
   }, []);
+
+  // Listen for reading progress updates from Reader or other tabs/windows
+  useEffect(() => {
+    fetchLastRead();
+
+    const handleProgressUpdated = () => {
+      fetchLastRead();
+    };
+
+    const handleFocus = () => {
+      fetchLastRead();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLastRead();
+      }
+    };
+
+    window.addEventListener("void_reading_progress_updated", handleProgressUpdated);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("void_reader_sync");
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === "progress_updated") {
+          fetchLastRead();
+        }
+      };
+    } catch {
+      // BroadcastChannel optional
+    }
+
+    return () => {
+      window.removeEventListener("void_reading_progress_updated", handleProgressUpdated);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (bc) bc.close();
+    };
+  }, [fetchLastRead]);
 
   // Initial mount: synchronize with Dexie storage and load data
   useEffect(() => {
@@ -87,7 +144,6 @@ export default function HomePage() {
     }
 
     init();
-    fetchLastRead();
 
     // Listen for source changes triggered from Settings or other tabs
     const handleSourceChanged = (event: Event) => {
@@ -110,7 +166,7 @@ export default function HomePage() {
       isMounted = false;
       window.removeEventListener("void_source_changed", handleSourceChanged);
     };
-  }, [activeSource, fetchHome, fetchLastRead]);
+  }, [activeSource, fetchHome]);
 
   // Handle user switching source directly from Home page
   const handleSelectSource = async (sourceId: string) => {
@@ -234,27 +290,45 @@ export default function HomePage() {
         {/* Continue Reading Pill if user has reading history */}
         {lastRead && (
           <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-[#111827] to-[#111827] border border-cyan-500/30 flex items-center justify-between gap-4 shadow-lg shadow-cyan-950/20">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-12 h-14 rounded-lg overflow-hidden bg-gray-800 shrink-0 border border-cyan-500/30">
+            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div className="w-12 h-16 rounded-xl overflow-hidden bg-gray-800 shrink-0 border border-cyan-500/30 shadow-md">
                 <img
-                  src={normalizeImageUrl(lastRead.cover || lastRead.thumbnail)}
+                  src={getBestMangaCover(lastRead, lastRead.sourceId)}
                   alt={lastRead.title || "Cover Manga"}
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     const target = e.currentTarget;
-                    if (target.src !== "/placeholder.jpg") {
+                    if (!target.src.includes("/api/proxy/image") && !target.src.startsWith("/") && !target.src.includes("placeholder.jpg")) {
+                      target.src = `/api/proxy/image?url=${encodeURIComponent(target.src)}`;
+                    } else if (!target.src.endsWith("/placeholder.jpg")) {
                       target.src = "/placeholder.jpg";
                     }
                   }}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-[#00E5FF] font-semibold">
-                  Lanjutkan Membaca
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-[#00E5FF] font-semibold">
+                    Lanjutkan Membaca
+                  </span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[#00E5FF] font-mono font-bold">
+                    {lastRead.progress && lastRead.progress >= 100
+                      ? "Selesai (100%)"
+                      : `${Math.round(lastRead.progress || 0)}% dibaca`}
+                  </span>
+                </div>
                 <h4 className="text-sm font-bold text-white truncate">{lastRead.title}</h4>
                 <p className="text-xs text-gray-400 truncate">{lastRead.lastChapterTitle}</p>
+                {/* Mini Progress Bar */}
+                <div className="mt-2 w-full max-w-[200px] bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#00E5FF] h-full rounded-full transition-all duration-300 shadow-[0_0_8px_#00E5FF]"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, lastRead.progress || 0))}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -262,7 +336,7 @@ export default function HomePage() {
               href={`/reader/${lastRead.lastChapterId}?manga=${lastRead.id}${
                 lastRead.sourceId ? `&source=${lastRead.sourceId}` : ""
               }`}
-              className="shrink-0 px-4 py-2 rounded-xl bg-[#00E5FF] hover:bg-cyan-300 text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(0,229,255,0.4)]"
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-[#00E5FF] hover:bg-cyan-300 text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(0,229,255,0.4)] hover:scale-102 active:scale-98"
             >
               <span>Lanjut</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -285,15 +359,19 @@ export default function HomePage() {
         {/* Latest Chapter Updates Carousel */}
         <MangaCarousel
           title="Update Chapter Terbaru"
-          subtitle={`Rilis chapter terbaru dari ${currentSourceMeta.name}`}
-          items={data.latest.slice(0, 15)}
+          subtitle={
+            activeSource === "all"
+              ? "Update chapter komik terbaru dari semua server (Komiku, Komikcast, Shinigami, Webtoon)"
+              : `Rilis chapter terbaru dari ${currentSourceMeta.name}`
+          }
+          items={data.latest.slice(0, 24)}
           icon={<Clock className="w-6 h-6 text-[#00E5FF]" />}
           viewAllHref={`/explore?source=${activeSource}&sort=latest`}
         />
 
         {/* Recommendations Carousel */}
         <MangaCarousel
-          title="Rekomendasi Void Reader"
+          title="Rekomendasi Void Verse"
           subtitle={`Koleksi pilihan terbaik dari ${currentSourceMeta.name}`}
           items={data.recommendations}
           icon={<Sparkles className="w-6 h-6 text-yellow-400" />}
@@ -312,14 +390,19 @@ export default function HomePage() {
             <div>
               <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                 <Compass className="w-6 h-6 text-cyan-400" />
-                Semua Rilis Terbaru
+                <span>Semua Rilis Terbaru</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 font-semibold">
+                  {data.latest.length} Komik
+                </span>
               </h2>
               <p className="text-sm text-gray-400">
-                Jelajahi komik segar yang baru di-update di {currentSourceMeta.name}
+                {activeSource === "all"
+                  ? "Update 200 chapter terbaru dari seluruh server komik, diurutkan dari chapter baru ke lama"
+                  : `Jelajahi komik segar yang baru di-update di ${currentSourceMeta.name}`}
               </p>
             </div>
             <Link
-              href={`/explore?source=${activeSource}`}
+              href={`/explore?source=${activeSource}&sort=latest`}
               className="text-xs sm:text-sm font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
             >
               <span>Katalog Lengkap</span>
@@ -329,7 +412,7 @@ export default function HomePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
             {data.latest.map((manga: MangaItem) => (
-              <MangaCard key={manga.id} manga={manga} />
+              <MangaCard key={`${manga.sourceId || "src"}-${manga.id}`} manga={manga} />
             ))}
           </div>
         </section>

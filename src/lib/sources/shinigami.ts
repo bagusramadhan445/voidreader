@@ -111,7 +111,7 @@ export class ShinigamiSource implements MangaSource {
 
   async getLatest(page = 1): Promise<MangaItem[]> {
     try {
-      const res = await fetch(`${this.apiBaseUrl}/v1/manga/list?page=${page}&page_size=20&sort=latest_chapter_time`, {
+      const res = await fetch(`${this.apiBaseUrl}/v1/manga/list?page=${page}&page_size=20`, {
         next: { revalidate: 600 },
         headers: { "Accept": "application/json" },
       });
